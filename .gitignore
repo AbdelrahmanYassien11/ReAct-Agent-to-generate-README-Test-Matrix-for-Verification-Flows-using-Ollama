@@ -1,0 +1,8 @@
+# Python virtual environment
+.venv/
+
+# GitHub metadata
+.github/
+
+# Python cache folders (recursive)
+**/__pycache__/

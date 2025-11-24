@@ -6,3 +6,5 @@
 
 # Python cache folders (recursive)
 **/__pycache__/
+
+/output

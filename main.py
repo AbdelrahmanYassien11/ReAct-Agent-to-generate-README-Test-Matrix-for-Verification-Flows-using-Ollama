@@ -1,47 +1,66 @@
 #!/usr/bin/env python3
 """
-main.py - entrypoint for the ReAct-style Ollama agent
-Supports commands: generate, explain, debug, rerun
+main.py - TRUE ReAct agent with explicit data flow
 """
 import argparse
 from agents.generator_agent import GeneratorAgent
-from utils import load_spec
 
 def main():
-    parser = argparse.ArgumentParser(description="AI Agent for README + Test Matrix (Ollama, ReAct)")
-    parser.add_argument("command", choices=["generate", "explain", "debug", "rerun"], help="Action to perform")
-    parser.add_argument("--spec", default="examples/example_spec.py", help="Path to spec file (Python dict)")
-    parser.add_argument("--model", default="phi3", help="Ollama model name (local)")
-    parser.add_argument("--outdir", default="output", help="Output directory")
-    parser.add_argument("--last_response", default=None, help="Path to a previous LLM response to rerun")
+    parser = argparse.ArgumentParser(
+        description="TRUE ReAct Agent for Test Matrix Generation"
+    )
+    parser.add_argument(
+        "command",
+        choices=["generate", "explain"],
+        help="Action to perform"
+    )
+    parser.add_argument(
+        "--spec",
+        default="examples/example_spec.py",
+        help="Path to spec file"
+    )
+    parser.add_argument(
+        "--model",
+        default="phi3",
+        help="Routing model (decides which tools to call)"
+    )
+    parser.add_argument(
+        "--content-model",
+        default=None,
+        help="Content generation model (generates scenario details)"
+    )
+    parser.add_argument(
+        "--outdir",
+        default="output",
+        help="Output directory"
+    )
 
     args = parser.parse_args()
 
-    spec = load_spec(args.spec)
-    agent = GeneratorAgent(model=args.model, outdir=args.outdir)
+    agent = GeneratorAgent(
+        model=args.model,
+        content_model=args.content_model,
+        outdir=args.outdir
+    )
 
     if args.command == "generate":
-        outputs = agent.run(spec)
-        print("Generated files:")
-        for f in outputs:
-            print(" -", f)
+        print(f"\nGenerating test matrix from: {args.spec}")
+        if args.content_model:
+            print(f"Dual-model setup:")
+            print(f"  - Routing: {args.model}")
+            print(f"  - Content: {args.content_model}")
+        
+        outputs = agent.run(args.spec)
+        
+        if outputs:
+            print("\n✓ Generated:")
+            for f in outputs:
+                print(f"  - {f}")
+        else:
+            print("\n✗ Failed. Check output/execution_history.json")
 
     elif args.command == "explain":
-        print(agent.explain(spec))
-
-    elif args.command == "debug":
-        print(agent.debug(spec))
-
-    elif args.command == "rerun":
-        if not args.last_response:
-            print("Provide --last_response path to rerun")
-            return
-        with open(args.last_response, "r", encoding="utf-8") as f:
-            resp = f.read()
-        outputs = agent.rerun_from_response(spec, resp)
-        print("Rerun outputs:")
-        for f in outputs:
-            print(" -", f)
+        print(agent.explain(args.spec))
 
 if __name__ == "__main__":
     main()

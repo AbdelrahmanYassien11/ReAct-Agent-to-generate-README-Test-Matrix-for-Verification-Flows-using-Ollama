@@ -1,17 +1,22 @@
-# Example spec as a Python dict (no JSON/YAML required)
+# Example specification for test matrix generation
+
 spec = {
     "project_name": "AHB-Lite Verification",
-    "short_description": "Verify a simple AHB-Lite-like interface with bursts and IDLE behavior.",
+    "short_description": "Verify AHB-Lite interface with bursts and IDLE behavior",
     "dut": "u_core.core_i.if_stage_i",
     "methodology": "UVM",
     "simulator": "VCS",
     "stimulus": "constrained-random",
+    
+    # Features to verify - will generate test scenarios for each
     "features": [
         "handshake",
         "burst transfers",
         "idle insertion",
         "error response",
     ],
+    
+    # Coverage bins - will be mapped to test scenarios
     "coverage": [
         "fsm_states",
         "burst_lengths",

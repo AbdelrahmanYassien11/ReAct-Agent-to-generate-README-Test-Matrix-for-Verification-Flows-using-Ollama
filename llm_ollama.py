@@ -1,7 +1,5 @@
 """
-llm_ollama.py
-
-Small wrapper around the `ollama` CLI. If `ollama` is not available, returns an error message.
+llm_ollama.py - Ollama wrapper with better timeout handling
 """
 import subprocess
 
@@ -10,15 +8,27 @@ class OllamaLLM:
         self.model = model
 
     def __call__(self, prompt: str) -> str:
-        # Call `ollama run <model>` and stream prompt via stdin
         try:
-            proc = subprocess.run(["ollama", "run", self.model], input=prompt.encode(), stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=1000)
+            # Increased timeout to 600 seconds (10 minutes)
+            proc = subprocess.run(
+                ["ollama", "run", self.model],
+                input=prompt.encode(),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=1000
+            )
+            
             out = proc.stdout.decode().strip()
+            
             if not out:
                 err = proc.stderr.decode().strip()
-                return f"[ollama_no_output] stderr={err}"
+                return f"[Error: No output. stderr={err[:200]}]"
+            
             return out
+            
         except FileNotFoundError:
-            return "[ollama_not_installed] Please install ollama: https://ollama.com"
+            return "[Error: Ollama not installed. Visit https://ollama.com]"
+        except subprocess.TimeoutExpired:
+            return "[Error: Timeout after 10 minutes. Model may be stuck or prompt too complex]"
         except Exception as e:
-            return f"[ollama_error] {e}"
+            return f"[Error: {str(e)[:200]}]"

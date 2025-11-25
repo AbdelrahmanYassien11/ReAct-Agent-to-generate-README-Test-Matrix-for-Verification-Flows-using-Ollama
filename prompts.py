@@ -1,81 +1,73 @@
 """
-prompts.py - Simplified TRUE ReAct prompts
-Clear, concise, fast to parse
+prompts.py - CRYSTAL CLEAR prompts to prevent confusion
 """
 
-SYSTEM_PROMPT = """You are a test matrix generator using ReAct framework.
+SYSTEM_PROMPT = """You are a test scenario generator using ReAct framework.
 
-Format:
+RESPONSE FORMAT (you must follow exactly):
 Thought: [your reasoning]
 Action: [tool_name]
-Action Input: {{"key": "value"}}
+Action Input: {"key": "value"}
 
-Tools:
+AVAILABLE TOOLS:
 
-1. load_spec
-   Input: {{"spec_path": "path/to/spec.py"}}
-   Returns: Summary of loaded spec
+1. parse_spec
+   What: Parse specification file
+   Input: {"spec_path": "examples/example_spec.py"}
+   Output: JSON with features list
    
-2. get_next_task
-   Input: {{}}
-   Returns: JSON with next task OR completion message
+2. extract_test_requirements
+   What: Analyze what to test for a feature (uses LLM)
+   Input: {"parsed_spec": "<JSON from parse_spec>", "feature": "feature_name"}
+   Output: JSON with test requirements
    
-3. generate_scenario
-   Input: {{"feature": "name", "type": "normal|edge_case", "coverage_bin": "bin_name"}}
-   Returns: JSON with scenario details
+3. generate_test_scenario
+   What: Create ONE test scenario (uses LLM)
+   Input: {
+     "feature": "feature_name",
+     "scenario_type": "normal_operation|edge_case",
+     "requirements": "<JSON from extract_test_requirements>",
+     "parsed_spec": "<JSON from parse_spec>"
+   }
+   Output: JSON with complete scenario
    
-4. add_scenario
-   Input: {{"scenario_json": "<JSON from generate_scenario>"}}
-   Returns: Confirmation
-   
-5. write_file
-   Input: {{"outdir": "output"}}
-   Returns: File path
+4. format_and_write
+   What: Write all scenarios to markdown file
+   Input: {"outdir": "output"}
+   Output: File path
 
-Workflow:
-1. load_spec
-2. Loop:
-   - get_next_task
-   - If task=generate_scenario: generate_scenario then add_scenario
-   - If task=complete: break
-3. write_file
-4. Final Answer
+WORKFLOW:
+1. parse_spec (get features list)
+2. For each feature:
+   a. extract_test_requirements (what to test)
+   b. For each scenario_type in requirements:
+      - generate_test_scenario (create scenario)
+3. format_and_write (save file)
+4. Final Answer: Done!
 
-Rules:
-- Keep JSON simple and clean
-- Pass tool outputs to next tool
-- When get_next_task says "complete", write file and finish
+CRITICAL RULES:
+- You are NOT writing code
+- You are CALLING tools by outputting Action/Action Input
+- Always pass previous outputs to next tool inputs
+- Use JSON format for Action Input
+- Wait for Observation before next action
 
-Example:
-Thought: Load the spec first
-Action: load_spec
-Action Input: {{"spec_path": "examples/example_spec.py"}}
+EXAMPLE:
+Thought: I'll parse the spec file first
+Action: parse_spec
+Action Input: {"spec_path": "examples/example_spec.py"}
 
-[wait for observation]
+[System returns observation]
 
-Thought: Get the first task
-Action: get_next_task
-Action Input: {{}}
-
-[observation: {{"task": "generate_scenario", "feature": "handshake", "type": "normal", "coverage_bin": "fsm_states"}}]
-
-Thought: Generate scenario for handshake
-Action: generate_scenario
-Action Input: {{"feature": "handshake", "type": "normal", "coverage_bin": "fsm_states"}}
-
-[observation: {{"feature": "handshake", "preconditions": "...", ...}}]
-
-Thought: Add this scenario
-Action: add_scenario
-Action Input: {{"scenario_json": "{{\\"feature\\": \\"handshake\\", \\"preconditions\\": \\"...\\", ...}}"}}
+Thought: Now I'll extract requirements for the first feature
+Action: extract_test_requirements
+Action Input: {"parsed_spec": "<the JSON I got>", "feature": "handshake"}
 """
 
-TASK_PROMPT = """Task: Generate test matrix from spec file.
+TASK_PROMPT = """Generate test matrix for: {spec_path}
 
-Spec: {spec_path}
-
-Start now:
-Thought: I'll load the specification file first
-Action: load_spec
+Start by parsing the spec:
+Thought: I need to parse the specification file to get the list of features
+Action: parse_spec
 Action Input: {{"spec_path": "{spec_path}"}}
 """

@@ -1,6 +1,0 @@
-{
-  "status": "success",
-  "steps": 5,
-  "final_answer": "Output directory for test matrix files.\n\nThis code orchestrates a workflow that generates test matrix from the loaded specification file. It uses React framework tools to perform each step of the proc",
-  "tool_calls": 4
-}

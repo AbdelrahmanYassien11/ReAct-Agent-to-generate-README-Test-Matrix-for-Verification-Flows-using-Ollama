@@ -1,259 +1,450 @@
 """
-tools.py - Optimized TRUE ReAct tools
-Simplified data flow, faster execution, better error handling
+tools.py - MINIMAL set of essential tools for TRUE ReAct agent
 """
+
 import os
 import json
 import re
 from typing import Dict, Any
 
-_scenario_buffer = []
-_current_scenario_id = 1
-_spec_data = None
-
-def reset_scenario_buffer():
-    global _scenario_buffer, _current_scenario_id, _spec_data
-    _scenario_buffer = []
-    _current_scenario_id = 1
-    _spec_data = None
+_scenarios = []
+_features = []
 
 
-def load_spec_tool(inp: Dict[str, Any]) -> str:
+def reset_state():
+    global _scenarios, _features
+    _scenarios = []
+    _features = []
+
+
+# ==============================================================================================================#
+
+
+import os
+import json
+import re
+from typing import Dict, Any
+
+
+def parse_spec_tool(inp: Dict[str, Any], content_llm: Any) -> Dict[str, Any]:
     """
-    Load and validate spec file.
-    Input: {"spec_path": "examples/example_spec.py"}
-    Output: Success message with spec summary
+    Parse a natural language spec document, extract feature descriptions, use LLM to generate verbose feature descriptions,
+    and output those descriptions as a JSON file compatible with extract_test_requirements_tool.
+
+    Input:
+    - {"spec_path": "examples/amba_ahb_lite_spec.txt"}
+    - content_llm: an instance of the LLM service
+
+    Output:
+    - JSON file containing a list of features (compatible with extract_test_requirements_tool)
     """
-    global _spec_data
-    
+
+    # 1. Extracting the path to the specification document
     spec_path = inp.get("spec_path")
-    spec_dict = inp.get("spec_dict")
-    
-    if spec_dict:
-        _spec_data = spec_dict
-    elif spec_path:
-        try:
-            with open(spec_path, 'r') as f:
-                code = f.read()
-            namespace = {}
-            exec(code, namespace)
-            if 'spec' not in namespace:
-                return "[Error: No 'spec' variable in file]"
-            _spec_data = namespace['spec']
-        except Exception as e:
-            return f"[Error loading spec: {e}]"
-    else:
-        return "[Error: No spec_path or spec_dict provided]"
-    
-    features = _spec_data.get("features", [])
-    coverage = _spec_data.get("coverage", [])
-    
-    return f"""Spec loaded successfully:
-Project: {_spec_data.get('project_name', 'Unknown')}
-Features: {', '.join(features)}
-Coverage: {', '.join(coverage)}
-Scenarios needed: {len(features) * 2}"""
+    if not spec_path:
+        return {"error": "spec_path required"}
+
+    try:
+        # 2. Read the natural language spec document (plain text file)
+        with open(spec_path, "r") as f:
+            spec_text = f.read()
+
+        # 3. Extract feature names using regular expressions
+        features = extract_feature_headings(spec_text)
+
+        # 4. Process each feature and generate verbose descriptions using LLM
+        feature_list = []
+        for feature in features:
+            if feature:
+                # Construct prompt for LLM to get detailed descriptions
+                description = generate_feature_description(feature, content_llm)
+
+                # Build the structure compatible with extract_test_requirements_tool
+                feature_data = {
+                    "feature": feature,
+                    "test_requirements": {
+                        "scenarios_needed": 2,  # You can adjust this based on your spec
+                        "scenario_types": [
+                            "normal_operation",
+                            "edge_case",
+                        ],  # Adjust this as needed
+                        "coverage_mapping": {
+                            "normal_operation": "fsm_states",  # Example
+                            "edge_case": "addr_alignments",  # Example
+                        },
+                        "test_focus": description,  # Use LLM-generated description as the test focus
+                    },
+                }
+
+                feature_list.append(feature_data)
+
+        # 5. Output file path for verbose feature descriptions
+        output_file_path = "parsed_spec/feature_descriptions.json"
+        os.makedirs(os.path.dirname(output_file_path), exist_ok=True)
+
+        # 6. Write the feature list to the JSON file
+        with open(output_file_path, "w") as output_file:
+            json.dump(feature_list, output_file, indent=2)
+
+        return {"success": f"Feature descriptions saved to {output_file_path}"}
+
+    except Exception as e:
+        return {"error": str(e)}
 
 
-def get_next_task_tool(inp: Dict[str, Any]) -> str:
+def extract_feature_headings(spec_text: str) -> list:
     """
-    Get next task to work on.
-    Input: {}
-    Output: JSON with task info or completion message
+    Extract feature names from a natural language specification document using regex.
+    This function identifies section headings and uses them as feature names.
+
+    Input:
+    - spec_text (str): The text content of the spec document
+
+    Output:
+    - List of feature descriptions (each a string)
     """
-    if not _spec_data:
-        return "[Error: Load spec first using load_spec]"
-    
-    features = _spec_data.get("features", [])
-    coverage = _spec_data.get("coverage", [])
-    
-    # Count scenarios per feature
-    counts = {}
-    for s in _scenario_buffer:
-        feat = s.get("feature", "")
-        counts[feat] = counts.get(feat, 0) + 1
-    
-    # Find feature needing scenarios
+    features = []
+
+    # Example pattern to match numbered section headings like "3.1 Basic transfers"
+    section_pattern = r"\d+\.\d+\s+([A-Za-z0-9\s\-]+)"
+    sections = re.findall(section_pattern, spec_text)
+
+    return sections
+
+
+def generate_feature_description(feature: str, content_llm: Any) -> str:
+    """
+    Given a feature name, ask the LLM to generate a detailed description.
+
+    Input:
+    - feature (str): The feature name
+    - content_llm: an instance of the LLM service
+
+    Output:
+    - A detailed description generated by the LLM
+    """
+    prompt = f"""
+    You are a verification engineer. Please analyze and explain the following feature in detail, covering the following aspects:
+    1. **Core Functionality**: What does the feature do? What are the primary tasks it performs?
+    2. **Key Behaviors**: What is the expected behavior of this feature under normal conditions? What conditions trigger this feature to act?
+    3. **Edge Cases & Limitations**: What are the potential edge cases, limitations, or exceptional conditions where this feature might behave differently?
+    4. **Use Cases**: Where is this feature typically used, and in what scenarios?
+
+    Feature: {feature}
+
+    Output ONLY JSON:
+    {{
+      "description": "detailed explanation of the feature, including functionality, key behaviors, edge cases, and use cases"
+    }}
+    """
+
+    # Call the LLM to generate the feature description
+    feature_description = content_llm.generate_description(prompt)
+
+    return feature_description
+
+
+# ==============================================================================================================#
+
+
+def extract_test_requirements_tool(
+    input_json_file: str, content_llm: Any
+) -> Dict[str, Any]:
+    """
+    Process a JSON file with multiple features and generate test requirements for each feature.
+    Output is written as a single JSON file in: output/requirements/test_requirements.json
+    """
+
+    # Read input JSON file
+    try:
+        with open(input_json_file, "r") as file:
+            features = json.load(file)
+    except Exception as e:
+        return {"error": f"Failed to read input JSON file: {str(e)}"}
+
+    # Ensure that the output directory exists
+    output_dir = "output/requirements"
+    os.makedirs(output_dir, exist_ok=True)
+
+    # This will hold the output for all features
+    all_test_requirements = []
+
+    # Process each feature in the input file
     for feature in features:
-        count = counts.get(feature, 0)
-        if count < 2:
-            scenario_type = "normal" if count == 0 else "edge_case"
-            coverage_bin = coverage[len(_scenario_buffer) % len(coverage)] if coverage else "general"
-            
-            return json.dumps({
-                "task": "generate_scenario",
-                "feature": feature,
-                "type": scenario_type,
-                "coverage_bin": coverage_bin,
-                "progress": f"{len(_scenario_buffer)}/{len(features)*2}"
-            })
-    
-    return json.dumps({"task": "complete", "total_scenarios": len(_scenario_buffer)})
+        if not feature:
+            all_test_requirements.append({"error": "Missing feature"})
+            continue
 
-
-def generate_scenario_tool(inp: Dict[str, Any]) -> str:
-    """
-    Generate scenario using content LLM.
-    Input: {"feature": "handshake", "type": "normal", "coverage_bin": "fsm_states"}
-    Output: JSON with scenario details
-    """
-    feature = inp.get("feature")
-    scenario_type = inp.get("type", "normal")
-    coverage_bin = inp.get("coverage_bin", "general")
-    content_llm = inp.get("content_llm")
-    
-    if not feature:
-        return "[Error: No feature specified]"
-    if not content_llm:
-        return "[Error: content_llm not available]"
-    if not _spec_data:
-        return "[Error: Load spec first]"
-    
-    dut = _spec_data.get("dut", "DUT")
-    
-    # Simplified prompt
-    prompt = f"""Generate test scenario as JSON only (no other text):
+        # Generate the prompt for the LLM (no parsed_spec here, just feature)
+        prompt = f"""You are a verification engineer. Analyze what needs to be tested for this feature.
 
 Feature: {feature}
+
+Output ONLY JSON:
+{{
+  "scenarios_needed": 2,
+  "scenario_types": ["normal_operation", "edge_case"],
+  "coverage_mapping": {{"normal_operation": "fsm_states", "edge_case": "addr_alignments"}},
+  "test_focus": "brief description of what to test"
+}}"""
+
+        # Simulate LLM output (replace with actual LLM call)
+        llm_output = {
+            "scenarios_needed": 2,
+            "scenario_types": ["normal_operation", "edge_case"],
+            "coverage_mapping": {
+                "normal_operation": "fsm_states",
+                "edge_case": "addr_alignments",
+            },
+            "test_focus": "brief description of what to test",
+        }
+
+        # Add the output to the list with the feature name as a key
+        all_test_requirements.append(
+            {"feature": feature, "test_requirements": llm_output}
+        )
+
+    # Write all test requirements to a single JSON file
+    output_file_path = os.path.join(output_dir, "test_requirements.json")
+
+    try:
+        with open(output_file_path, "w") as f:
+            json.dump(all_test_requirements, f, indent=4)
+    except Exception as e:
+        return {"error": f"Failed to write to file: {str(e)}"}
+
+    # Return a success message
+    return {
+        "success": f"Test requirements saved for all features in {output_file_path}"
+    }
+
+
+# ==============================================================================================================#
+
+
+def generate_test_scenarios_tool(inp: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Generate test scenarios for each feature and its scenario types from the input JSON file containing test requirements.
+    Outputs valid test scenarios for each feature into a single JSON file called `test_scenarios.json`.
+
+    Input:
+    - input_json_file: JSON file containing test requirements for each feature and scenario types.
+    - content_llm: LLM instance for generating test scenarios.
+
+    Output:
+    - JSON file (`test_scenarios.json`) containing all generated test scenarios for each feature and scenario type.
+    """
+
+    input_json_file = inp.get("input_json_file")
+    content_llm = inp.get("content_llm")
+
+    if not all([input_json_file, content_llm]):
+        return {"error": "input_json_file and content_llm are required"}
+
+    try:
+        # Read input JSON file containing test requirements for each feature
+        with open(input_json_file, "r") as file:
+            features = json.load(file)
+    except Exception as e:
+        return {"error": f"Failed to read input JSON file: {str(e)}"}
+
+    # Ensure output directory exists
+    output_dir = "output/scenarios"
+    os.makedirs(output_dir, exist_ok=True)
+
+    all_scenarios = []
+
+    # Loop through each feature and generate test scenarios for its scenario types
+    for feature_data in features:
+        feature = feature_data.get("feature")
+        test_requirements = feature_data.get("test_requirements")
+
+        if not feature or not test_requirements:
+            continue
+
+        # Extract scenario types and focus
+        scenario_types = test_requirements.get("scenario_types", [])
+        coverage_mapping = test_requirements.get("coverage_mapping", {})
+        test_focus = test_requirements.get("test_focus", "")
+
+        # Generate a test scenario for each scenario type
+        for scenario_type in scenario_types:
+            coverage_bin = coverage_mapping.get(scenario_type, "general")
+
+            # Generate a unique scenario ID
+            scenario_id = f"T{len(_scenarios) + 1:03d}"
+
+            # Construct the prompt for the LLM to generate a test scenario
+            prompt = f"""Generate ONE test scenario as JSON only (no explanations):
+
+Scenario ID: {scenario_id}
+Feature: {feature}
 Type: {scenario_type}
-DUT: {dut}
+Focus: {test_focus}
 Coverage: {coverage_bin}
 
 {{
-  "preconditions": "initial conditions",
-  "stimulus": "trigger event",
-  "test_steps": "1) action 2) check 3) verify 4) confirm",
-  "expected_result": "expected outcome",
+  "scenario_id": "{scenario_id}",
+  "feature": "{feature}",
+  "preconditions": "specific initial conditions",
+  "stimulus": "specific trigger",
+  "test_steps": "1) specific action 2) check response 3) verify timing 4) confirm state",
+  "expected_result": "specific expected outcome with metrics",
+  "coverage_bin": "{coverage_bin}",
   "priority": "high|medium|low"
-}}"""
-    
+}}
+
+Requirements: test_steps MUST have 4 numbered steps."""
+
+            try:
+                # Call the LLM to generate the scenario
+                response = content_llm(prompt)
+                response = re.sub(r"```json|```", "", response).strip()
+
+                # Try to parse the response as JSON
+                try:
+                    data = json.loads(response)
+                except:
+                    # Try best-effort extraction from the response string
+                    match = re.search(r"\{[\s\S]*\}", response)
+                    if match:
+                        data = json.loads(match.group(0))
+                    else:
+                        # Fallback scenario if LLM response is not valid
+                        data = {
+                            "scenario_id": scenario_id,
+                            "feature": feature,
+                            "preconditions": f"DUT initialized for {feature}",
+                            "stimulus": f"Trigger {feature} operation",
+                            "test_steps": (
+                                f"1) Initiate {feature} 2) Monitor response "
+                                f"3) Verify timing 4) Confirm completion"
+                            ),
+                            "expected_result": f"{feature} completes successfully",
+                            "coverage_bin": coverage_bin,
+                            "priority": "high",
+                        }
+
+                # Append the generated scenario to the list of all scenarios (in memory)
+                _scenarios.append(data)
+
+            except Exception as e:
+                return {"error": f"Failed to generate or save test scenario: {str(e)}"}
+
+    # Write all generated scenarios to a single JSON file called 'test_scenarios.json'
+    output_file_path = os.path.join(output_dir, "test_scenarios.json")
     try:
-        response = content_llm(prompt)
-        response = re.sub(r'```json|```', '', response).strip()
-        
-        # Try parsing
-        try:
-            data = json.loads(response)
-        except:
-            # Extract JSON from text
-            match = re.search(r'\{[\s\S]*\}', response)
-            if match:
-                data = json.loads(match.group(0))
-            else:
-                # Generate fallback
-                data = {
-                    "preconditions": f"DUT ready for {feature} test",
-                    "stimulus": f"Trigger {feature} operation",
-                    "test_steps": f"1) Initiate {feature} 2) Monitor response 3) Check timing 4) Verify completion",
-                    "expected_result": f"{feature.title()} completes successfully",
-                    "priority": "high"
-                }
-        
-        # Add metadata
-        data["feature"] = feature
-        data["coverage_bin"] = coverage_bin
-        
-        return json.dumps(data)
-        
+        with open(output_file_path, "w") as output_file:
+            json.dump(
+                _scenarios, output_file, indent=2
+            )  # Writing the scenarios from memory to the output file
     except Exception as e:
-        return f"[Error: {e}]"
+        return {"error": f"Failed to write test scenarios to file: {str(e)}"}
 
-
-def add_scenario_tool(inp: Dict[str, Any]) -> str:
-    """
-    Add scenario to buffer.
-    Input: {"scenario_json": "<from generate_scenario>"}
-    Output: Confirmation
-    """
-    global _current_scenario_id
-    
-    scenario_json = inp.get("scenario_json")
-    if not scenario_json:
-        return "[Error: No scenario_json provided]"
-    
-    try:
-        data = json.loads(scenario_json)
-    except:
-        return "[Error: Invalid JSON]"
-    
-    required = ["feature", "preconditions", "stimulus", "test_steps", "expected_result", "coverage_bin", "priority"]
-    missing = [f for f in required if f not in data]
-    if missing:
-        return f"[Error: Missing {', '.join(missing)}]"
-    
-    scenario = {
-        "scenario_id": f"T{_current_scenario_id:03d}",
-        "feature": data["feature"],
-        "preconditions": data["preconditions"],
-        "stimulus": data["stimulus"],
-        "test_steps": data["test_steps"],
-        "expected_result": data["expected_result"],
-        "coverage_bin": data["coverage_bin"],
-        "priority": data["priority"]
+    # Return a success message with the path to the output file
+    return {
+        "success": f"Test scenarios successfully generated and saved in {output_file_path}",
+        "scenarios_count": len(
+            _scenarios
+        ),  # Optional: Return the number of scenarios generated
     }
-    
-    _scenario_buffer.append(scenario)
-    _current_scenario_id += 1
-    
-    return f"Added {scenario['scenario_id']} ({len(_scenario_buffer)} total)"
 
 
-def write_file_tool(inp: Dict[str, Any]) -> str:
+# ==============================================================================================================#
+
+
+def format_and_write_tool(inp: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Write test matrix file.
-    Input: {"outdir": "output"}
-    Output: File path
+    Format all scenarios as markdown table and return a file object.
+    The ReAct executor will handle writing the file to disk.
+
+    Input:
+        {
+            "outdir": "output"
+        }
+
+    Output:
+        {
+            "filename": "TEST_MATRIX.md",
+            "content": "<markdown text>"
+        }
     """
+
+    # Directory to save the file, defaulting to 'output'
     outdir = inp.get("outdir", "output")
-    
-    if not _scenario_buffer:
-        return "[Error: No scenarios to write]"
-    
+
+    # Read the test_scenarios.json file
+    test_scenarios_file = os.path.join(outdir, "test_scenarios.json")
+
+    # Ensure the file exists before attempting to read
+    if not os.path.exists(test_scenarios_file):
+        return {"error": f"{test_scenarios_file} not found"}
+
+    # Read the scenarios from the file
+    try:
+        with open(test_scenarios_file, "r") as f:
+            scenarios = json.load(f)
+    except Exception as e:
+        return {"error": f"Failed to read {test_scenarios_file}: {str(e)}"}
+
+    # Check if scenarios exist in the loaded data
+    if not scenarios:
+        return {"error": "No scenarios found in the test_scenarios.json file"}
+
+    # Build table header for the Markdown table
     table = """| Scenario ID | Feature | Preconditions | Stimulus | Test Steps | Expected Result | Coverage Bin | Priority |
 |-------------|---------|---------------|----------|------------|-----------------|--------------|----------|
 """
-    
-    for s in _scenario_buffer:
-        table += f"| {s['scenario_id']} | {s['feature']} | {s['preconditions']} | {s['stimulus']} | {s['test_steps']} | {s['expected_result']} | {s['coverage_bin']} | {s['priority']} |\n"
-    
-    # Format with spacing
+
+    # Append each scenario row to the table
+    for s in scenarios:
+        table += (
+            f"| {s.get('scenario_id', 'T000')} "
+            f"| {s.get('feature', '')} "
+            f"| {s.get('preconditions', '')} "
+            f"| {s.get('stimulus', '')} "
+            f"| {s.get('test_steps', '')} "
+            f"| {s.get('expected_result', '')} "
+            f"| {s.get('coverage_bin', '')} "
+            f"| {s.get('priority', '')} |\n"
+        )
+
+    # Format the table using dynamic column widths
     formatted = _format_table(table)
-    
-    path = os.path.join(outdir, "TEST_MATRIX.md")
-    os.makedirs(outdir, exist_ok=True)
-    
-    try:
-        with open(path, "w", encoding="utf-8") as f:
-            f.write(formatted)
-        return f"SUCCESS: {path} ({len(_scenario_buffer)} scenarios)"
-    except Exception as e:
-        return f"[Error: {e}]"
+
+    # Return the formatted Markdown content
+    return {"filename": "TEST_MATRIX.md", "content": formatted}
 
 
 def _format_table(table_text: str) -> str:
-    """Format table with dynamic column widths."""
+    """Format table with dynamic column widths so the Markdown is readable."""
+
     lines = table_text.split("\n")
     table_lines = [l for l in lines if l.strip().startswith("|")]
-    
+
     if len(table_lines) < 2:
         return table_text
-    
+
+    # Extract rows from the table
     rows = []
     for line in table_lines:
         cells = [c.strip() for c in line.split("|")[1:-1]]
         rows.append(cells)
-    
+
     num_cols = len(rows[0]) if rows else 0
     col_widths = [0] * num_cols
-    
+
+    # Determine the maximum width for each column
     for row in rows:
         for i, cell in enumerate(row):
             if i < num_cols and "---" not in cell:
                 col_widths[i] = max(col_widths[i], len(cell))
-    
+
+    # Add some padding to each column
     for i in range(num_cols):
         col_widths[i] += max(3, int(col_widths[i] * 0.1))
-    
+
+    # Build the formatted rows with correct column widths
     formatted_lines = []
     for row in rows:
         formatted_cells = []
@@ -264,14 +455,13 @@ def _format_table(table_text: str) -> str:
                 else:
                     formatted_cells.append(cell.ljust(col_widths[i]))
         formatted_lines.append("| " + " | ".join(formatted_cells) + " |")
-    
+
     return "\n".join(formatted_lines)
 
 
 TOOL_REGISTRY = {
-    "load_spec": load_spec_tool,
-    "get_next_task": get_next_task_tool,
-    "generate_scenario": generate_scenario_tool,
-    "add_scenario": add_scenario_tool,
-    "write_file": write_file_tool,
+    "parse_spec": parse_spec_tool,
+    "extract_test_requirements": extract_test_requirements_tool,  # input -> verbose_features.json
+    "generate_test_scenario": generate_test_scenarios_tool,  # input -> test_requirements.json
+    "format_and_write": format_and_write_tool,  # input -> test_scenarios.json
 }

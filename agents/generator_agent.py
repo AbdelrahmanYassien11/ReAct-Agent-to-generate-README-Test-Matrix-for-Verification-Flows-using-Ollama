@@ -1,5 +1,5 @@
 """
-agents/generator_agent.py - TRUE ReAct agent with comprehensive failure reporting
+agents/generator_agent.py - TRUE ReAct agent with comprehensive debugging
 """
 
 from llm_ollama import OllamaLLM
@@ -19,7 +19,7 @@ class GeneratorAgent:
         self.executor = ReActExecutor(
             llm_call=self.llm,
             tools=TOOL_REGISTRY,
-            max_steps=25,
+            max_steps=6,  # 4 tools + final answer + 1 buffer
             content_llm=self.content_llm,
         )
         print(f"Agent initialized:")
@@ -48,82 +48,132 @@ class GeneratorAgent:
             json.dumps(
                 {
                     "status": result["status"],
-                    "steps_taken": result["steps"],
+                    "steps_taken": result.get("steps", 0),
                     "max_steps": self.executor.max_steps,
                     "failures_count": len(result.get("failures", [])),
                     "failures": result.get("failures", []),
                     "final_answer": result.get("final_answer", "")[:500],
+                    "error": result.get("error", ""),
                 },
                 indent=2,
             ),
         )
 
         # ========================================
-        # PRINT RESULTS
+        # PRINT DETAILED RESULTS
         # ========================================
         print(f"\n{'='*60}")
         print(f"EXECUTION SUMMARY")
         print(f"{'='*60}")
         print(f"Status: {result['status']}")
-        print(f"Steps: {result['steps']}/{self.executor.max_steps}")
+        print(f"Steps: {result.get('steps', 0)}/{self.executor.max_steps}")
+
+        if result.get("error"):
+            print(f"Error: {result['error']}")
 
         failures = result.get("failures", [])
         if failures:
-            print(f"\n⚠ Failures encountered: {len(failures)}")
-            for i, failure in enumerate(failures[:5], 1):  # Show first 5
-                print(
-                    f"  {i}. Step {failure.get('step')}: {failure.get('type')} - {failure.get('message', failure.get('error', 'Unknown'))}"
-                )
-            if len(failures) > 5:
-                print(f"  ... and {len(failures) - 5} more (see {summary_path})")
+            print(f"\nFailures encountered: {len(failures)}")
+            for i, failure in enumerate(failures, 1):
+                print(f"\n  Failure {i}:")
+                print(f"    Step: {failure.get('step')}")
+                print(f"    Action: {failure.get('action')}")
+                print(f"    Type: {failure.get('type')}")
+                print(f"    Error: {failure.get('error')}")
+                if i >= 5:
+                    print(f"\n  ... and {len(failures) - 5} more (see {summary_path})")
+                    break
 
         # ========================================
         # CHECK OUTPUT FILES
         # ========================================
+        print(f"\n{'='*60}")
+        print(f"OUTPUT FILES CHECK")
+        print(f"{'='*60}")
+
         test_matrix_path = f"{self.outdir}/TEST_MATRIX.md"
         files_generated = []
 
+        # Check test matrix
         if os.path.exists(test_matrix_path):
             files_generated.append(test_matrix_path)
-            print(f"\n✓ Test matrix generated: {test_matrix_path}")
+            size = os.path.getsize(test_matrix_path)
+            print(f"[OK] TEST_MATRIX.md exists ({size} bytes)")
         else:
-            print(f"\n✗ Test matrix NOT generated")
+            print(f"[MISSING] TEST_MATRIX.md NOT found")
 
-        # Check for other outputs
-        for subdir in ["parsed_spec", "requirements", "scenarios"]:
-            subdir_path = f"{self.outdir}/{subdir}"
-            if os.path.exists(subdir_path):
-                files = [
-                    f for f in os.listdir(subdir_path) if f.endswith((".json", ".md"))
-                ]
-                if files:
-                    print(f"✓ {subdir}: {len(files)} files")
-                    files_generated.extend([f"{subdir_path}/{f}" for f in files])
+        # Check intermediate outputs
+        intermediate_files = {
+            "parsed_spec.json": "Parsed specification",
+            "test_requirements.json": "Test requirements",
+            "test_scenarios.json": "Test scenarios",
+        }
+
+        print(f"\nIntermediate files:")
+        for filename, description in intermediate_files.items():
+            filepath = f"{self.outdir}/{filename}"
+            if os.path.exists(filepath):
+                size = os.path.getsize(filepath)
+                print(f"  [OK] {filename} ({size} bytes) - {description}")
+                files_generated.append(filepath)
+            else:
+                print(f"  [MISSING] {filename} - {description}")
+
+        # Check step outputs
+        steps_dir = f"{self.outdir}/steps"
+        if os.path.exists(steps_dir):
+            step_files = [
+                f for f in os.listdir(steps_dir) if f.endswith((".json", ".txt"))
+            ]
+            print(f"\nStep outputs: {len(step_files)} files in {steps_dir}/")
+            if step_files:
+                print(f"  Latest: {sorted(step_files)[-1]}")
+
+        # ========================================
+        # DIAGNOSE WHY IT FAILED
+        # ========================================
+        if result["status"] != "SUCCESS":
+            print(f"\n{'='*60}")
+            print(f"FAILURE DIAGNOSIS")
+            print(f"{'='*60}")
+
+            # Check which step failed
+            if failures:
+                last_failure = failures[-1]
+                print(f"Last failure at step {last_failure.get('step')}:")
+                print(f"  Action: {last_failure.get('action')}")
+                print(f"  Error: {last_failure.get('error')}")
+
+                # Check the tool output file
+                step_num = last_failure.get("step")
+                tool_file = f"{self.outdir}/steps/step_{step_num:02d}_tool.json"
+                if os.path.exists(tool_file):
+                    print(f"\n  Tool output saved to: {tool_file}")
+                    with open(tool_file, "r", encoding="utf-8") as f:
+                        tool_output = json.load(f)
+                        print(f"  Tool response: {json.dumps(tool_output, indent=4)}")
+
+            # Suggest next steps
+            print(f"\nDebugging suggestions:")
+            print(f"  1. Check {self.outdir}/steps/ for detailed step outputs")
+            print(f"  2. Check {summary_path} for full execution details")
+            print(f"  3. Look at the routing model responses in step_XX_routing.txt")
+            print(f"  4. Look at the tool responses in step_XX_tool.json")
 
         # ========================================
         # FINAL VERDICT
         # ========================================
         print(f"\n{'='*60}")
         if result["status"] == "SUCCESS" and os.path.exists(test_matrix_path):
-            print(f"✓✓✓ SUCCESS - Test matrix generated successfully!")
+            print(f"SUCCESS - Test matrix generated successfully!")
             print(f"{'='*60}")
             return files_generated
         elif result["status"] == "SUCCESS":
-            print(f"⚠⚠⚠ PARTIAL SUCCESS - Agent completed but no test matrix found")
+            print(f"PARTIAL SUCCESS - Agent completed but no test matrix found")
             print(f"{'='*60}")
             return files_generated
         else:
-            print(f"✗✗✗ FAILED - Agent did not complete task")
-            print(f"Reason: {result.get('failure_reason', 'Unknown')}")
-            if failures:
-                print(f"Failed at step: {result.get('failed_at_step')}")
-                print(
-                    f"Last error: {failures[-1].get('message', failures[-1].get('error', 'Unknown'))}"
-                )
-            print(f"\nCheck these files for details:")
-            print(f"  - {self.outdir}/progress.md")
-            print(f"  - {summary_path}")
-            print(f"  - {self.outdir}/steps/ (individual step outputs)")
+            print(f"FAILED - Agent did not complete task")
             print(f"{'='*60}")
             return []
 
@@ -135,16 +185,15 @@ Routing: {self.llm.model}
 Content: {self.content_llm.model}
 
 Tools:
-1. parse_spec - Parse file
-2. extract_test_requirements - Analyze feature (LLM)
-3. generate_test_scenario - Create scenario (LLM)
-4. format_and_write - Write markdown
+1. parse_spec - Parse file (content model)
+2. extract_test_requirements - Analyze features (content model)
+3. generate_test_scenarios - Create scenarios (content model)
+4. format_and_write - Write markdown (no LLM)
 
 Output Structure:
-- progress.md - Step-by-step progress log
 - execution_summary.json - Final status and failures
-- steps/ - Individual step outputs
-- parsed_spec/ - Parsed specification
-- requirements/ - Test requirements per feature
-- scenarios/ - Individual test scenarios
+- steps/ - Individual step outputs (routing + tool)
+- 01_parsed_spec.json - Parsed specification
+- 02_test_requirements.json - Test requirements
+- 03_test_scenarios.json - Test scenarios
 - TEST_MATRIX.md - Final output"""

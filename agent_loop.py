@@ -1,5 +1,7 @@
 """
-agent_loop.py - ReAct executor with full observability and failure tracking
+agent_loop.py - ReAct executor with dual-model architecture
+ROUTING MODEL: Used only for orchestration (this loop)
+CONTENT MODEL: Injected into tools for content generation
 """
 
 import re
@@ -15,59 +17,66 @@ class ReActExecutor:
         self,
         llm_call: Callable,
         tools: Dict,
-        max_steps: int = 25,
+        max_steps: int = 6,
         content_llm: Callable = None,
     ):
-        self.llm = llm_call
-        self.content_llm = content_llm or llm_call
+        """
+        Initialize ReAct executor with dual-model setup.
+
+        Args:
+            llm_call: ROUTING MODEL - for orchestration/ReAct decisions only
+            tools: Dictionary of available tools
+            max_steps: Maximum number of steps
+            content_llm: CONTENT MODEL - for actual content generation in tools
+        """
+        self.llm = llm_call  # ROUTING MODEL - orchestration only
+        self.content_llm = content_llm or llm_call  # CONTENT MODEL - content generation
         self.tools = tools
         self.max_steps = max_steps
         self.history = []
         self.failures = []
 
+        print(f"\nReAct Executor initialized:")
+        print(
+            f"  Routing model: {getattr(llm_call, 'model', 'unknown')} (orchestration)"
+        )
+        print(
+            f"  Content model: {getattr(self.content_llm, 'model', 'unknown')} (generation)"
+        )
+
+    # ---------------------------------------------------------
+    # Parse: Action
+    # ---------------------------------------------------------
     def _parse_action(self, text: str) -> Optional[str]:
-        match = re.search(r"Action:\s*(\w+)", text, re.IGNORECASE)
+        match = re.search(r"Action:\s*(\w+)", text)
         return match.group(1).strip() if match else None
 
+    # ---------------------------------------------------------
+    # Parse: Action Input JSON
+    # ---------------------------------------------------------
     def _parse_action_input(self, text: str) -> Dict[str, Any]:
-        match = re.search(
-            r"Action Input:\s*(\{[^}]*\})", text, re.IGNORECASE | re.DOTALL
-        )
+        match = re.search(r"Action Input:\s*(\{[\s\S]*?\})", text)
         if not match:
-            match = re.search(r"Action Input:\s*(\{[\s\S]*?\})", text, re.IGNORECASE)
-
-        if match:
-            json_str = match.group(1).strip()
-            json_str = re.sub(r"```json|```|`", "", json_str)
-            json_str = json_str.replace("\n", " ")
-
+            return {}
+        json_str = match.group(1).strip()
+        try:
+            return json.loads(json_str)
+        except:
             try:
-                return json.loads(json_str)
+                return json.loads(json_str.replace("'", '"'))
             except:
-                try:
-                    json_str = json_str.replace("'", '"')
-                    return json.loads(json_str)
-                except:
-                    pass
+                return {}
 
-        return {}
-
+    # ---------------------------------------------------------
+    # Main ReAct Loop (ROUTING MODEL ONLY)
+    # ---------------------------------------------------------
     def run(self, system_prompt: str, spec_path: str, outdir: str = "output") -> dict:
         reset_state()
 
-        # Setup directories
         os.makedirs(outdir, exist_ok=True)
         os.makedirs(f"{outdir}/steps", exist_ok=True)
 
-        # Start progress tracking
-        progress_path = f"{outdir}/progress.md"
-        with open(progress_path, "w", encoding="utf-8") as p:
-            p.write(f"# ReAct Agent Execution\n\n")
-            p.write(f"**Spec:** `{spec_path}`\n")
-            p.write(f"**Started:** {datetime.utcnow().isoformat()}Z\n")
-            p.write(f"**Max Steps:** {self.max_steps}\n\n")
-
-        prompt = system_prompt
+        prompt = system_prompt.replace("{spec_path}", spec_path)
 
         for step in range(self.max_steps):
             step_num = step + 1
@@ -75,231 +84,192 @@ class ReActExecutor:
             print(f"STEP {step_num}/{self.max_steps}")
             print(f"{'='*60}")
 
-            # ========================================
-            # LLM CALL
-            # ========================================
+            # ----------------------------------------------
+            # 1. CALL ROUTING MODEL (orchestration only)
+            # ----------------------------------------------
             try:
+                print("Calling ROUTING model for orchestration decision...")
                 response = self.llm(prompt)
+                print(f"  Routing decision made: {response[:150]}...")
             except Exception as e:
-                error_msg = f"LLM call failed: {str(e)}"
-                self.failures.append(
-                    {"step": step_num, "type": "llm_error", "message": error_msg}
-                )
-                print(f"✗ {error_msg}")
+                error_msg = f"Routing model error: {str(e)}"
+                print(f"ERROR: {error_msg}")
+                return {"status": "FAILED", "error": error_msg, "steps": step_num}
 
-                # Save error
-                with open(f"{outdir}/steps/step_{step_num:02d}_ERROR.txt", "w") as f:
-                    f.write(f"LLM Error: {error_msg}\n")
+            self.history.append(("routing_llm", response))
 
-                return {
-                    "status": "FAILED",
-                    "failure_reason": "LLM call error",
-                    "failed_at_step": step_num,
-                    "failures": self.failures,
-                    "history": self.history,
-                    "steps": step_num,
-                }
-
-            # Save LLM response
+            # Save routing model output
             with open(
-                f"{outdir}/steps/step_{step_num:02d}_llm.txt", "w", encoding="utf-8"
+                f"{outdir}/steps/step_{step_num:02d}_routing.txt", "w", encoding="utf-8"
             ) as f:
                 f.write(response)
 
-            display = response[:300] + "..." if len(response) > 300 else response
-            print(f"\nAgent response:\n{display}")
-
-            self.history.append(("llm", response))
-
-            # ========================================
-            # CHECK FOR COMPLETION
-            # ========================================
+            # Check Final Answer
             if "Final Answer:" in response:
-                final = re.search(
-                    r"Final Answer:\s*(.+)", response, re.IGNORECASE | re.DOTALL
-                )
-                if final:
-                    final_text = final.group(1).strip()
-                    print(f"\n✓ COMPLETED: {final_text[:150]}")
+                final_text = response.split("Final Answer:")[1].strip()
+                print(f"\nFINAL ANSWER RECEIVED at step {step_num}")
+                print(f"  {final_text[:200]}...")
 
-                    # Update progress
-                    with open(progress_path, "a", encoding="utf-8") as p:
-                        p.write(f"\n## ✓ COMPLETED at Step {step_num}\n")
-                        p.write(f"**Final Answer:** {final_text[:200]}\n")
-
+                # Check if this is premature (no tools executed yet)
+                if step_num == 1:
+                    print(
+                        f"\nERROR: Routing model provided Final Answer WITHOUT executing any tools!"
+                    )
+                    print(
+                        f"  This is a routing model failure - it should call tools first."
+                    )
+                    print(f"  The model is not following the ReAct format.")
                     return {
-                        "status": "SUCCESS",
+                        "status": "FAILED",
+                        "error": "Routing model gave Final Answer without executing tools",
                         "final_answer": final_text,
-                        "history": self.history,
-                        "failures": self.failures,
                         "steps": step_num,
+                        "failures": [
+                            {
+                                "step": step_num,
+                                "type": "premature_final_answer",
+                                "error": "Routing model did not follow ReAct format - gave Final Answer without calling any tools",
+                            }
+                        ],
                     }
 
-            # ========================================
-            # PARSE ACTION
-            # ========================================
+                # Otherwise it's legitimate
+                return {
+                    "status": "SUCCESS",
+                    "final_answer": final_text,
+                    "steps": step_num,
+                    "failures": self.failures,
+                }
+
+            # ----------------------------------------------
+            # 2. PARSE ACTION (from routing model decision)
+            # ----------------------------------------------
             action = self._parse_action(response)
             action_input = self._parse_action_input(response)
 
-            print(f"\nAction: {action}")
-            print(f"Input keys: {list(action_input.keys())}")
-
             if not action:
-                error_msg = "No action found in response"
-                self.failures.append(
-                    {"step": step_num, "type": "parse_error", "message": error_msg}
-                )
-                observation = {"error": error_msg}
-                print(f"✗ {error_msg}")
+                error_msg = "No Action found in routing model response"
+                print(f"\nERROR: {error_msg}")
+                print(f"  Routing model response didn't contain 'Action: tool_name'")
+                print(f"  Response preview: {response[:500]}")
+                return {
+                    "status": "FAILED",
+                    "error": error_msg,
+                    "steps": step_num,
+                    "failures": [
+                        {
+                            "step": step_num,
+                            "type": "no_action_found",
+                            "error": error_msg,
+                            "response_preview": response[:500],
+                        }
+                    ],
+                }
+
+            tool = self.tools.get(action)
+            if not tool:
+                error_msg = f"Unknown tool: {action}"
+                print(f"ERROR: {error_msg}")
+                return {"status": "FAILED", "error": error_msg, "steps": step_num}
+
+            print(f"\nExecuting tool: {action}")
+            print(f"  Action input keys: {list(action_input.keys())}")
+            if not action_input or (len(action_input) == 0):
+                print(f"  WARNING: Action Input is empty!")
+                print(f"  Routing model response preview:")
+                print(
+                    f"  {response[-500:]}"
+                )  # Show last 500 chars to see the Action Input
             else:
-                tool = self.tools.get(action)
-                if not tool:
-                    error_msg = f"Unknown tool '{action}'"
-                    available = ", ".join(self.tools.keys())
+                print(f"  Action input preview: {str(action_input)[:200]}...")
+
+            # ----------------------------------------------
+            # 3. INJECT CONTENT MODEL into tool
+            # ----------------------------------------------
+            # All tools that need LLM get the CONTENT MODEL
+            action_input["content_llm"] = self.content_llm
+
+            # ----------------------------------------------
+            # 4. EXECUTE TOOL (with content model)
+            # ----------------------------------------------
+            try:
+                print(f"  Calling tool function with content model...")
+                observation = tool(action_input)
+                print(f"\nTool Response:")
+
+                if "error" in observation:
+                    print(f"  ERROR: {observation['error']}")
+                    print(f"  Full observation: {json.dumps(observation, indent=2)}")
+                    # Track failure
                     self.failures.append(
                         {
                             "step": step_num,
-                            "type": "unknown_tool",
                             "action": action,
-                            "available_tools": list(self.tools.keys()),
+                            "error": observation["error"],
+                            "type": "tool_error",
                         }
                     )
-                    observation = {"error": f"{error_msg}. Available: {available}"}
-                    print(f"✗ {error_msg}")
                 else:
-                    # ========================================
-                    # EXECUTE TOOL
-                    # ========================================
-                    try:
-                        # Inject content_llm for tools that need it
-                        if action in [
-                            "extract_test_requirements",
-                            "generate_test_scenario",
-                        ]:
-                            action_input["content_llm"] = self.content_llm
-
-                        observation = tool(action_input)
-
-                        # Check if tool returned error
-                        if isinstance(observation, dict) and "error" in observation:
-                            self.failures.append(
-                                {
-                                    "step": step_num,
-                                    "type": "tool_error",
-                                    "action": action,
-                                    "error": observation["error"],
-                                }
-                            )
-                            print(f"✗ Tool error: {observation['error']}")
-                        elif isinstance(observation, str) and observation.startswith(
-                            "[Error"
-                        ):
-                            self.failures.append(
-                                {
-                                    "step": step_num,
-                                    "type": "tool_error",
-                                    "action": action,
-                                    "error": observation,
-                                }
-                            )
-                            print(f"✗ Tool error: {observation}")
-                        else:
-                            # Success - write file if returned
-                            if (
-                                isinstance(observation, dict)
-                                and "filename" in observation
-                            ):
-                                file_path = os.path.join(
-                                    outdir, observation["filename"]
-                                )
-                                os.makedirs(os.path.dirname(file_path), exist_ok=True)
-                                with open(file_path, "w", encoding="utf-8") as f:
-                                    f.write(observation["content"])
-                                print(f"✓ Wrote: {file_path}")
-                            else:
-                                print(f"✓ Tool succeeded")
-
-                    except Exception as e:
-                        error_msg = f"Tool execution exception: {str(e)}"
-                        self.failures.append(
-                            {
-                                "step": step_num,
-                                "type": "tool_exception",
-                                "action": action,
-                                "exception": str(e),
-                            }
+                    print(f"  Tool completed successfully")
+                    if "total_features" in observation:
+                        print(f"    Features parsed: {observation['total_features']}")
+                    if "total_requirements" in observation:
+                        print(
+                            f"    Requirements generated: {observation['total_requirements']}"
                         )
-                        observation = {"error": error_msg}
-                        print(f"✗ {error_msg}")
+                    if "total_scenarios" in observation:
+                        print(
+                            f"    Scenarios generated: {observation['total_scenarios']}"
+                        )
+                    if "scenarios_count" in observation:
+                        print(
+                            f"    Scenarios written: {observation['scenarios_count']}"
+                        )
+                    if "file_path" in observation:
+                        print(f"    Output file: {observation['file_path']}")
 
-            # ========================================
-            # SAVE OBSERVATION
-            # ========================================
-            obs_path = f"{outdir}/steps/step_{step_num:02d}_tool.json"
-            with open(obs_path, "w", encoding="utf-8") as f:
-                if isinstance(observation, dict):
-                    json.dump(observation, f, indent=2)
-                else:
-                    json.dump({"observation": observation}, f, indent=2)
+            except Exception as e:
+                observation = {"error": str(e)}
+                print(f"  EXCEPTION during tool execution: {str(e)}")
+                print(f"  Exception type: {type(e).__name__}")
+                import traceback
+
+                print(f"  Traceback:\n{traceback.format_exc()}")
+                # Track failure
+                self.failures.append(
+                    {
+                        "step": step_num,
+                        "action": action,
+                        "error": str(e),
+                        "type": "exception",
+                    }
+                )
+
+            # Save tool output
+            with open(
+                f"{outdir}/steps/step_{step_num:02d}_tool.json", "w", encoding="utf-8"
+            ) as f:
+                json.dump(observation, f, indent=2)
+
+            print(f"  Saved tool output to: step_{step_num:02d}_tool.json")
 
             self.history.append(("tool", observation))
 
-            # ========================================
-            # UPDATE PROGRESS LOG
-            # ========================================
-            with open(progress_path, "a", encoding="utf-8") as p:
-                status_icon = (
-                    "✗"
-                    if (isinstance(observation, dict) and "error" in observation)
-                    else "✓"
-                )
-                p.write(f"\n## {status_icon} Step {step_num}\n")
-                p.write(f"- **Action:** `{action}`\n")
+            # ----------------------------------------------
+            # 5. BUILD NEXT PROMPT for ROUTING MODEL
+            # ----------------------------------------------
+            # Pass full observation to routing model so it can extract data
+            obs_str = json.dumps(observation)
 
-                # Filter out non-serializable objects before logging
-                log_input = {
-                    k: v for k, v in action_input.items() if k != "content_llm"
-                }
-                p.write(f"- **Input:** `{json.dumps(log_input)[:100]}`\n")
+            prompt += f"\n{response}\n" f"Observation: {obs_str}\n\n"
 
-                if isinstance(observation, dict) and "error" in observation:
-                    p.write(f"- **Error:** {observation['error']}\n")
-                elif isinstance(observation, dict) and "filename" in observation:
-                    p.write(f"- **Output:** `{observation['filename']}`\n")
-                p.write(f"- **Details:** `{obs_path}`\n")
-
-            # ========================================
-            # BUILD NEXT PROMPT
-            # ========================================
-            obs_str = (
-                json.dumps(observation)[:1000]
-                if isinstance(observation, dict)
-                else str(observation)[:1000]
-            )
-            prompt += f"\n{response}\nObservation: {obs_str}\n\n"
-
-            # Context management
-            if len(prompt) > 5000:
-                prompt = (
-                    system_prompt
-                    + "\n\n[Earlier steps omitted for brevity]\n\n"
-                    + prompt[-3000:]
-                )
-
-        # ========================================
-        # MAX STEPS REACHED
-        # ========================================
-        print(f"\n✗ FAILED: Max steps ({self.max_steps}) reached without completion")
-
-        with open(progress_path, "a", encoding="utf-8") as p:
-            p.write(f"\n## ✗ FAILED - Max Steps Reached\n")
-            p.write(f"Agent did not complete task in {self.max_steps} steps\n")
-
+        error_msg = "Max steps reached without Final Answer"
+        print(f"\nERROR: {error_msg}")
+        print(f"  Completed {self.max_steps} steps without reaching Final Answer")
+        print(f"  Total failures: {len(self.failures)}")
         return {
             "status": "FAILED",
-            "failure_reason": "max_steps_reached",
-            "failed_at_step": self.max_steps,
-            "failures": self.failures,
-            "history": self.history,
+            "error": error_msg,
             "steps": self.max_steps,
+            "failures": self.failures,
         }

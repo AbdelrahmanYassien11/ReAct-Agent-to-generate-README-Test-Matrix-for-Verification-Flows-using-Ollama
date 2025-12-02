@@ -55,16 +55,44 @@ class ReActExecutor:
     # Parse: Action Input JSON
     # ---------------------------------------------------------
     def _parse_action_input(self, text: str) -> Dict[str, Any]:
-        match = re.search(r"Action Input:\s*(\{[\s\S]*?\})", text)
+        """
+        Extract Action Input JSON from routing model response.
+        Handles nested JSON structures.
+        """
+        match = re.search(r"Action Input:\s*(\{.*)", text, re.DOTALL)
         if not match:
             return {}
-        json_str = match.group(1).strip()
+
+        # Get everything after "Action Input:"
+        json_text = match.group(1).strip()
+
+        # Try to find the complete JSON by counting braces
+        brace_count = 0
+        json_end = 0
+        for i, char in enumerate(json_text):
+            if char == "{":
+                brace_count += 1
+            elif char == "}":
+                brace_count -= 1
+                if brace_count == 0:
+                    json_end = i + 1
+                    break
+
+        if json_end > 0:
+            json_str = json_text[:json_end]
+        else:
+            json_str = json_text
+
+        # Try to parse JSON
         try:
             return json.loads(json_str)
         except:
             try:
+                # Try with single quotes replaced
                 return json.loads(json_str.replace("'", '"'))
             except:
+                print(f"  WARNING: Failed to parse Action Input JSON")
+                print(f"  Raw text: {json_str[:200]}")
                 return {}
 
     # ---------------------------------------------------------
@@ -104,7 +132,24 @@ class ReActExecutor:
             ) as f:
                 f.write(response)
 
-            # Check Final Answer
+            # Check if model is hallucinating multiple actions
+            action_count = response.count("Action:")
+            if action_count > 1:
+                print(
+                    f"\n  WARNING: Routing model wrote {action_count} Actions in one response!"
+                )
+                print(f"  It should only write ONE Action and then stop.")
+                print(f"  We will only process the FIRST action and ignore the rest.")
+
+                # Truncate response to only include first action
+                # Find the second "Action:" and cut there
+                first_action_pos = response.find("Action:")
+                second_action_pos = response.find("Action:", first_action_pos + 1)
+                if second_action_pos > 0:
+                    response = response[:second_action_pos]
+                    print(f"  Truncated response to first action only.")
+
+            # Check Final Answer (after potential truncation)
             if "Final Answer:" in response:
                 final_text = response.split("Final Answer:")[1].strip()
                 print(f"\nFINAL ANSWER RECEIVED at step {step_num}")
@@ -144,14 +189,19 @@ class ReActExecutor:
             # ----------------------------------------------
             # 2. PARSE ACTION (from routing model decision)
             # ----------------------------------------------
+            print(f"\nParsing routing model response...")
             action = self._parse_action(response)
             action_input = self._parse_action_input(response)
+
+            print(f"  Parsed Action: {action}")
+            print(f"  Parsed Action Input: {action_input}")
 
             if not action:
                 error_msg = "No Action found in routing model response"
                 print(f"\nERROR: {error_msg}")
                 print(f"  Routing model response didn't contain 'Action: tool_name'")
-                print(f"  Response preview: {response[:500]}")
+                print(f"  Full response:")
+                print(f"  {response}")
                 return {
                     "status": "FAILED",
                     "error": error_msg,

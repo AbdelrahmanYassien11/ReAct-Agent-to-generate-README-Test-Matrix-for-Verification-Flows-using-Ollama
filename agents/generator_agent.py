@@ -4,7 +4,7 @@ agents/generator_agent.py - TRUE ReAct agent with comprehensive debugging
 
 from llm_ollama import OllamaLLM
 from agent_loop import ReActExecutor
-from tools import TOOL_REGISTRY
+from agent_tools.tools import TOOL_REGISTRY
 from prompts import SYSTEM_PROMPT, TASK_PROMPT
 from utils import safe_write
 import json

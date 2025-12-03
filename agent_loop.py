@@ -9,7 +9,7 @@ import json
 import os
 from typing import Callable, Dict, Any, Optional
 from datetime import datetime
-from tools import reset_state
+from agent_tools.tools import reset_state
 
 
 class ReActExecutor:
@@ -135,19 +135,25 @@ class ReActExecutor:
             # Check if model is hallucinating multiple actions
             action_count = response.count("Action:")
             if action_count > 1:
-                print(
-                    f"\n  WARNING: Routing model wrote {action_count} Actions in one response!"
-                )
-                print(f"  It should only write ONE Action and then stop.")
-                print(f"  We will only process the FIRST action and ignore the rest.")
+                print(f"\n  WARNING: Model wrote {action_count} Actions (should be 1)")
+                print(f"  Processing FIRST action only, ignoring the rest")
 
                 # Truncate response to only include first action
-                # Find the second "Action:" and cut there
                 first_action_pos = response.find("Action:")
                 second_action_pos = response.find("Action:", first_action_pos + 1)
                 if second_action_pos > 0:
                     response = response[:second_action_pos]
-                    print(f"  Truncated response to first action only.")
+                    print(f"  Response truncated")
+
+            # Also check for hallucinated Observations
+            if (
+                "Observation:" in response
+                and response.index("Observation:") < len(response) - 20
+            ):
+                print(f"\n  WARNING: Model wrote fake Observation")
+                print(f"  Truncating at Observation")
+                obs_pos = response.find("Observation:")
+                response = response[:obs_pos]
 
             # Check Final Answer (after potential truncation)
             if "Final Answer:" in response:
@@ -275,8 +281,11 @@ class ReActExecutor:
                         print(
                             f"    Scenarios written: {observation['scenarios_count']}"
                         )
+                    if "output_file" in observation:
+                        print(f"    Output file: {observation['output_file']}")
+                        print(f"    -> Pass this as 'input_file' to next tool")
                     if "file_path" in observation:
-                        print(f"    Output file: {observation['file_path']}")
+                        print(f"    File path: {observation['file_path']}")
 
             except Exception as e:
                 observation = {"error": str(e)}

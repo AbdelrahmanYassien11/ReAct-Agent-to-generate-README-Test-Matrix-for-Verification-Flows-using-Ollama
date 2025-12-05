@@ -19,7 +19,7 @@ class GeneratorAgent:
         self.executor = ReActExecutor(
             llm_call=self.llm,
             tools=TOOL_REGISTRY,
-            max_steps=6,  # 4 tools + final answer + 1 buffer
+            max_steps=4,  # 4 tools + final answer + 1 buffer
             content_llm=self.content_llm,
         )
         print(f"Agent initialized:")

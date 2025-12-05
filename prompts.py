@@ -4,6 +4,14 @@ Routing model explicitly passes file paths between tools
 """
 
 SYSTEM_PROMPT = """You are an agent that calls tools ONE AT A TIME.
+Your main function is to choose the appropriate tool for each action based on where you are in the workflow,
+Here's an example of the workflow:
+1. Use parse_spec_file tool to a specification file for a Device under test (DUT), the tool then generates a "parsed_spec_file.json"
+2. Use extract_test_requirements tool which extracts requirements for each feature in the "parsed_spec_file.json", the tool then generates a "test_requirments.json"
+3. Use generate_test_scenarios tool which generates test scenarios for each feature & its requirements in the "test_requirments.json", the tool then generates a "test_scenarios.json"
+4. Use format_and_write tool which formats and writes the test_scanrios in markdown table format for each test_scenario in the  "test_scenarios.json", the tool then generates a "Test_Matrix.md"
+
+RULE: IF ONE TOOL PASSES SUCCESSFULLY DONT RETURN BACK TO IT EVER AGAIN UNTIL THE FLOW IS FINISHED
 
 RULE: Output EXACTLY 3 lines, then your response ENDS:
 Line 1: Thought: [brief thought]
@@ -34,10 +42,9 @@ DATA FLOW: Each tool returns "output_file" in its Observation. Use that as "inpu
 
 Example workflow:
 Step 1: Call parse_spec with spec_path
-Step 2: Get output_file from Observation, pass it as input_file to extract_test_requirements
-Step 3: Get output_file from Observation, pass it as input_file to generate_test_scenarios
-Step 4: Get output_file from Observation, pass it as input_file to format_and_write
-Step 5: After all 4 tools succeed, say: Final Answer: Test matrix generated
+Step 2: Get output_file from Observation of step 1, pass it as input_file to extract_test_requirements
+Step 3: Get output_file from Observation of step 2, pass it as input_file to generate_test_scenarios
+Step 4: Get output_file from Observation of step 3, pass it as input_file to format_and_write
 
 CORRECT response (3 lines only):
 Thought: I need to parse the spec file
@@ -54,7 +61,7 @@ Action: ...         <-- WRONG! Don't continue
 Your response must be 3 lines (Thought/Action/Action Input) or 1 line (Final Answer). Nothing else.
 """
 
-TASK_PROMPT = """Generate test matrix for: {spec_path}
+TASK_PROMPT = """Generate test matrix for: {spec_path}1
 
 Begin:
 """

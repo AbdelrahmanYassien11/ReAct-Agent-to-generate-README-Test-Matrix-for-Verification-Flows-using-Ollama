@@ -17,7 +17,7 @@ class ReActExecutor:
         self,
         llm_call: Callable,
         tools: Dict,
-        max_steps: int = 6,
+        max_steps: int = 4,
         content_llm: Callable = None,
     ):
         """
@@ -118,7 +118,7 @@ class ReActExecutor:
             try:
                 print("Calling ROUTING model for orchestration decision...")
                 response = self.llm(prompt)
-                print(f"  Routing decision made: {response[:150]}...")
+                print(f"  Routing decision made: {response[:300]}...")
             except Exception as e:
                 error_msg = f"Routing model error: {str(e)}"
                 print(f"ERROR: {error_msg}")

@@ -1,0 +1,6 @@
+Example workflow:
+Step 1: Call parse_spec with spec_path
+Step 2: Get output_file from Observation, pass it as input_file to extract_test_requirements
+Step 3: Get output_file from Observation, pass it as input_file to generate_test_scenarios
+Step 4: Get output_file from Observation, pass it as input_file to format_and_write
+Step 5: After all 4 tools succeed, say: Final Answer: Test matrix generated

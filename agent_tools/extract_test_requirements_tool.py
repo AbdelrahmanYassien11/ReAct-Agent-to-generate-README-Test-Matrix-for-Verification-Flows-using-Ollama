@@ -87,10 +87,10 @@ Output ONLY JSON array:
     try:
         print(f"  Using CONTENT model to analyze {len(features)} features...")
         response = content_llm(prompt)
-        print(response)
+        # print(response)
         response = extract_code_block(response)
-        print(type(response))
-        print(response)
+        # print(type(response))
+        # print(response)
 
         try:
             all_requirements = json.loads(response)
@@ -98,7 +98,6 @@ Output ONLY JSON array:
                 raise ValueError("Expected array")
             print("[SUCCESS] [TOOL] [EXTRACT REQUIREMENTS]")
         except Exception as e:
-            # Fallback: generate simple requirements
             print("[FAIL] [TOOL] [EXTRACT REQUIREMENTS]")
             error_message = f"Requirements extraction failed: {str(e)}"
             # return {"error": error_message}  # Return the error message before exiting

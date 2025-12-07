@@ -1,0 +1,3 @@
+Thought: I have generated the test scenarios and obtained a total count of them; now it's time to format these into markdown tables for clarity in our workflow documentation using `format_and_write`.  
+Action: format_and_write  
+Action Input: {"input_file": "output/test_scenarios.json", "outdir": "output"} ✅

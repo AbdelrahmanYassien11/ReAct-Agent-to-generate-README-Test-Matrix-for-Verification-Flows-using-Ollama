@@ -1,0 +1,9 @@
+{
+  "status": "FAILED",
+  "steps_taken": 4,
+  "max_steps": 4,
+  "failures_count": 0,
+  "failures": [],
+  "final_answer": "",
+  "error": "Max steps reached without Final Answer"
+}

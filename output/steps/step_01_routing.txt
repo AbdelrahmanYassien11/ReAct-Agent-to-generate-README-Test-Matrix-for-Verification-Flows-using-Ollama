@@ -1,0 +1,3 @@
+Thought: I need to parse the example spec file into JSON format using `parse_spec`.  
+Action: parse_spec  
+Action Input: {"spec_path": "examples/example_spec.py"}

@@ -1,0 +1,17 @@
+{
+  "project": "AHB-Lite Verification",
+  "dut": "u_core.core_i.if_stage_i",
+  "features": [
+    "handshake",
+    "burst transfers",
+    "idle insertion",
+    "error response"
+  ],
+  "coverage": [
+    "fsm_states",
+    "burst_lengths",
+    "addr_alignments"
+  ],
+  "methodology": "UVM",
+  "total_features": 4
+}

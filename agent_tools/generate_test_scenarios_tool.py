@@ -74,7 +74,7 @@ def generate_test_scenarios_tool(inp: Dict[str, Any]) -> Dict[str, Any]:
             )
 
     # Create prompt for CONTENT MODEL
-    prompt = f"""Generate test scenarios for ALL features. 
+    prompt = f"""You are a design verification/digital verification engineer. Generate test scenarios for ALL features.
     Create {len(scenarios_needed)} scenarios total.
 
 Output ONLY JSON array (one scenario per feature+type):

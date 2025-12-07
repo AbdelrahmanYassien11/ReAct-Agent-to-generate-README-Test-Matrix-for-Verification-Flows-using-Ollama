@@ -1,0 +1,98 @@
+{
+  "all_requirements": [
+    {
+      "feature": "handshake",
+      "scenarios_needed": 8,
+      "scenario_types": [
+        "normal_operation",
+        "invalid_handshake",
+        "partial_handshake",
+        "timeout_handshake",
+        "acknowledged_handshake",
+        "negative_acked_handshake",
+        "reset_request_handshake",
+        "multi_stage_handshake"
+      ],
+      "coverage_mapping": {
+        "normal_operation": "fsm_states_bin1",
+        "invalid_handshake": "burst_lengths_bin2",
+        "partial_handshake": "addr_alignments_bin3"
+      },
+      "test_focus": "Test successful handshake protocols for normal operation, invalid handshake, partial handshake, timeout handshake, acknowledged handshake, negative-acked handshake, reset request handshake and multi-stage handshake."
+    },
+    {
+      "feature": "burst transfers",
+      "scenarios_needed": 15,
+      "scenario_types": [
+        "normal_burst",
+        "partial_burst",
+        "error_in_middle_of_burst",
+        "invalid_address",
+        "memory_allocation_failure",
+        "transfer_complete",
+        "partial_transfer",
+        "multiple_partial_transfers",
+        "simultaneous_multiple_partial_transfers",
+        "unintended_memory_access",
+        "transfer_in_progress",
+        "timeout_transfer",
+        "acknowledged_burst",
+        "negative_acked_burst"
+      ],
+      "coverage_mapping": {
+        "normal_burst": "fsm_states_bin1",
+        "partial_burst": "burst_lengths_bin2",
+        "error_in_middle_of_burst": "addr_alignments_bin3",
+        "invalid_address": "burst_lengths_bin4"
+      },
+      "test_focus": "Test successful burst transfers for normal burst, partial burst, error in middle of burst, invalid address, memory allocation failure, transfer complete, partial transfer, simultaneous multiple partial transfers, unintended memory access, transfer in progress, timeout transfer, acknowledged burst and negative-acked burst."
+    },
+    {
+      "feature": "idle insertion",
+      "scenarios_needed": 10,
+      "scenario_types": [
+        "normal_idle_insertion",
+        "partial_idle_insertion",
+        "invalid_idle_time",
+        "timer_overflow",
+        "reset_request_with_idleness",
+        "memory_allocation_failure_due_to_idle",
+        "transfer_complete_while_idle",
+        "partial_transfer_while_idle",
+        "multiple_partial_transfers_while_idle",
+        "unintended_memory_access_due_to_idle"
+      ],
+      "coverage_mapping": {
+        "normal_idle_insertion": "fsm_states_bin1",
+        "partial_idle_insertion": "burst_lengths_bin2",
+        "invalid_idle_time": "addr_alignments_bin3"
+      },
+      "test_focus": "Test successful idle insertion for normal idle insertion, partial idle insertion, invalid idle time, timer overflow, reset request with idleness, memory allocation failure due to idle, transfer complete while idle, partial transfer while idle, simultaneous multiple partial transfers while idle and unintended memory access due to idle."
+    },
+    {
+      "feature": "error response",
+      "scenarios_needed": 12,
+      "scenario_types": [
+        "normal_error_response",
+        "invalid_error_code",
+        "partial_error_response",
+        "timer_overflow_on_error_response",
+        "memory_allocation_failure_due_to_error_response",
+        "transfer_complete_while_error_response",
+        "partial_transfer_while_error_response",
+        "multiple_partial_transfers_while_error_response",
+        "unintended_memory_access_due_to_error_response",
+        "error_response_with_invalid_data",
+        "acknowledged_error_response",
+        "negative_acked_error_response"
+      ],
+      "coverage_mapping": {
+        "normal_error_response": "fsm_states_bin1",
+        "invalid_error_code": "burst_lengths_bin2",
+        "partial_error_response": "addr_alignments_bin3"
+      },
+      "test_focus": "Test successful error response for normal error response, invalid error code, partial error response, timer overflow on error response, memory allocation failure due to error response, transfer complete while error response, partial transfer while error response, simultaneous multiple partial transfers while error response, unintended memory access due to error response, error response with invalid data, acknowledged error response and negative-acked error response."
+    }
+  ],
+  "total_requirements": 4
+}

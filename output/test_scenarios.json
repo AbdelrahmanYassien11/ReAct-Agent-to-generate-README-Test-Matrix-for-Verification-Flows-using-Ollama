@@ -1,0 +1,325 @@
+{
+  "all_scenarios": [
+    {
+      "scenario_id": "T001",
+      "feature": "idle insertion",
+      "scenario_type": "memory_allocation_failure_due_to_idle",
+      "preconditions": [
+        "The system is in an idle state.",
+        "Memory allocation is enabled."
+      ],
+      "stimulus": "Trigger a memory allocation failure due to idle condition.",
+      "test_steps": [
+        "Initiate a memory allocation process.",
+        "Monitor the system for any errors or warnings related to memory allocation.",
+        "Verify that the system reports a memory allocation failure."
+      ],
+      "expected_result": "The system reports a memory allocation failure due to idle condition."
+    },
+    {
+      "scenario_id": "T002",
+      "feature": "error response",
+      "scenario_type": "memory_allocation_failure_due_to_error_response",
+      "preconditions": [
+        "An error occurs during memory allocation.",
+        "Error handling is enabled."
+      ],
+      "stimulus": "Trigger a memory allocation failure with an error response.",
+      "test_steps": [
+        "Initiate a memory allocation process with an invalid address.",
+        "Monitor the system for any errors or warnings related to memory allocation.",
+        "Verify that the system reports an error response due to memory allocation failure."
+      ],
+      "expected_result": "The system reports an error response due to memory allocation failure."
+    },
+    {
+      "scenario_id": "T003",
+      "feature": "idle insertion",
+      "scenario_type": "transfer_complete_while_idle",
+      "preconditions": [
+        "The system is in an idle state.",
+        "Transfer data is enabled."
+      ],
+      "stimulus": "Trigger a transfer operation while the system is in an idle state.",
+      "test_steps": [
+        "Initiate a transfer process with valid data.",
+        "Monitor the system for any errors or warnings related to transfer completion.",
+        "Verify that the system completes the transfer successfully."
+      ],
+      "expected_result": "The system completes the transfer operation successfully while in an idle state."
+    },
+    {
+      "scenario_id": "T004",
+      "feature": "error response",
+      "scenario_type": "partial_error_response",
+      "preconditions": [
+        "An error occurs during data processing.",
+        "Error handling is enabled."
+      ],
+      "stimulus": "Trigger a partial error response with an invalid data.",
+      "test_steps": [
+        "Initiate a data processing task with invalid input.",
+        "Monitor the system for any errors or warnings related to data processing.",
+        "Verify that the system reports a partial error response due to invalid input."
+      ],
+      "expected_result": "The system reports a partial error response due to invalid data."
+    },
+    {
+      "scenario_id": "T005",
+      "feature": "idle insertion",
+      "scenario_type": "multiple_partial_transfers_while_idle",
+      "preconditions": [
+        "The system is in an idle state.",
+        "Multiple transfer operations are enabled."
+      ],
+      "stimulus": "Trigger multiple partial transfer operations while the system is in an idle state.",
+      "test_steps": [
+        "Initiate multiple transfer processes with valid data.",
+        "Monitor the system for any errors or warnings related to transfer completion.",
+        "Verify that the system completes all transfers successfully."
+      ],
+      "expected_result": "The system completes all transfer operations successfully while in an idle state."
+    },
+    {
+      "scenario_id": "T006",
+      "feature": "error response",
+      "scenario_type": "timer_overflow_on_error_response",
+      "preconditions": [
+        "An error occurs during data processing.",
+        "Timer overflow handling is enabled."
+      ],
+      "stimulus": "Trigger a timer overflow on an error response.",
+      "test_steps": [
+        "Initiate a data processing task with invalid input.",
+        "Monitor the system for any errors or warnings related to timer overflow.",
+        "Verify that the system reports a timer overflow due to error response."
+      ],
+      "expected_result": "The system reports a timer overflow due to error response."
+    },
+    {
+      "scenario_id": "T007",
+      "feature": "idle insertion",
+      "scenario_type": "unintended_memory_access_due_to_idle",
+      "preconditions": [
+        "The system is in an idle state.",
+        "Memory access is enabled."
+      ],
+      "stimulus": "Trigger an unintended memory access due to idle condition.",
+      "test_steps": [
+        "Initiate a memory access process.",
+        "Monitor the system for any errors or warnings related to memory access.",
+        "Verify that the system reports an unintended memory access due to idle condition."
+      ],
+      "expected_result": "The system reports an unintended memory access due to idle condition."
+    },
+    {
+      "scenario_id": "T008",
+      "feature": "error response",
+      "scenario_type": "acknowledged_error_response",
+      "preconditions": [
+        "An error occurs during data processing.",
+        "Error handling is enabled."
+      ],
+      "stimulus": "Trigger an acknowledged error response with valid input.",
+      "test_steps": [
+        "Initiate a data processing task with invalid input.",
+        "Monitor the system for any errors or warnings related to error response.",
+        "Verify that the system reports an acknowledged error response due to valid input."
+      ],
+      "expected_result": "The system reports an acknowledged error response due to valid input."
+    },
+    {
+      "scenario_id": "T009",
+      "feature": "idle insertion",
+      "scenario_type": "partial_transfer_while_idle",
+      "preconditions": [
+        "The system is in an idle state.",
+        "Transfer data is enabled."
+      ],
+      "stimulus": "Trigger a partial transfer operation while the system is in an idle state.",
+      "test_steps": [
+        "Initiate a transfer process with invalid data.",
+        "Monitor the system for any errors or warnings related to transfer completion.",
+        "Verify that the system completes the transfer partially."
+      ],
+      "expected_result": "The system completes the transfer operation partially while in an idle state."
+    },
+    {
+      "scenario_id": "T010",
+      "feature": "error response",
+      "scenario_type": "negative_acked_error_response",
+      "preconditions": [
+        "An error occurs during data processing.",
+        "Error handling is enabled."
+      ],
+      "stimulus": "Trigger a negative-acked error response with invalid input.",
+      "test_steps": [
+        "Initiate a data processing task with invalid input.",
+        "Monitor the system for any errors or warnings related to error response.",
+        "Verify that the system reports a negative-acked error response due to invalid input."
+      ],
+      "expected_result": "The system reports a negative-acked error response due to invalid input."
+    },
+    {
+      "scenario_id": "T011",
+      "feature": "idle insertion",
+      "scenario_type": "transfer_complete",
+      "preconditions": [
+        "The system is in an idle state.",
+        "Transfer data is enabled."
+      ],
+      "stimulus": "Trigger a transfer operation while the system is in an idle state.",
+      "test_steps": [
+        "Initiate a transfer process with valid data.",
+        "Monitor the system for any errors or warnings related to transfer completion.",
+        "Verify that the system completes the transfer successfully."
+      ],
+      "expected_result": "The system completes the transfer operation successfully while in an idle state."
+    },
+    {
+      "scenario_id": "T012",
+      "feature": "error response",
+      "scenario_type": "memory_allocation_failure_due_to_transfer_complete",
+      "preconditions": [
+        "An error occurs during memory allocation.",
+        "Error handling is enabled."
+      ],
+      "stimulus": "Trigger a memory allocation failure due to transfer completion.",
+      "test_steps": [
+        "Initiate a transfer process with valid data.",
+        "Monitor the system for any errors or warnings related to memory allocation.",
+        "Verify that the system reports an error response due to memory allocation failure."
+      ],
+      "expected_result": "The system reports an error response due to memory allocation failure."
+    },
+    {
+      "scenario_id": "T013",
+      "feature": "idle insertion",
+      "scenario_type": "multiple_partial_transfers_while_transfer_complete",
+      "preconditions": [
+        "The system is in an idle state.",
+        "Multiple transfer operations are enabled."
+      ],
+      "stimulus": "Trigger multiple partial transfer operations while the system is in an idle state.",
+      "test_steps": [
+        "Initiate multiple transfer processes with valid data.",
+        "Monitor the system for any errors or warnings related to transfer completion.",
+        "Verify that the system completes all transfers successfully."
+      ],
+      "expected_result": "The system completes all transfer operations successfully while in an idle state."
+    },
+    {
+      "scenario_id": "T014",
+      "feature": "error response",
+      "scenario_type": "timer_overflow_on_error_response_with_invalid_data",
+      "preconditions": [
+        "An error occurs during data processing.",
+        "Timer overflow handling is enabled."
+      ],
+      "stimulus": "Trigger a timer overflow on an error response with invalid input.",
+      "test_steps": [
+        "Initiate a data processing task with invalid input.",
+        "Monitor the system for any errors or warnings related to timer overflow.",
+        "Verify that the system reports a timer overflow due to error response."
+      ],
+      "expected_result": "The system reports a timer overflow due to error response."
+    },
+    {
+      "scenario_id": "T015",
+      "feature": "idle insertion",
+      "scenario_type": "unintended_memory_access_due_to_transfer_complete",
+      "preconditions": [
+        "The system is in an idle state.",
+        "Memory access is enabled."
+      ],
+      "stimulus": "Trigger an unintended memory access due to transfer completion.",
+      "test_steps": [
+        "Initiate a memory access process.",
+        "Monitor the system for any errors or warnings related to memory access.",
+        "Verify that the system reports an unintended memory access due to transfer completion."
+      ],
+      "expected_result": "The system reports an unintended memory access due to transfer completion."
+    },
+    {
+      "scenario_id": "T016",
+      "feature": "error response",
+      "scenario_type": "acknowledged_error_response_with_valid_input",
+      "preconditions": [
+        "An error occurs during data processing.",
+        "Error handling is enabled."
+      ],
+      "stimulus": "Trigger an acknowledged error response with valid input.",
+      "test_steps": [
+        "Initiate a data processing task with invalid input.",
+        "Monitor the system for any errors or warnings related to error response.",
+        "Verify that the system reports an acknowledged error response due to valid input."
+      ],
+      "expected_result": "The system reports an acknowledged error response due to valid input."
+    },
+    {
+      "scenario_id": "T017",
+      "feature": "idle insertion",
+      "scenario_type": "partial_transfer_while_idle",
+      "preconditions": [
+        "The system is in an idle state.",
+        "Transfer data is enabled."
+      ],
+      "stimulus": "Trigger a partial transfer operation while the system is in an idle state.",
+      "test_steps": [
+        "Initiate a transfer process with invalid data.",
+        "Monitor the system for any errors or warnings related to transfer completion.",
+        "Verify that the system completes the transfer partially."
+      ],
+      "expected_result": "The system completes the transfer operation partially while in an idle state."
+    },
+    {
+      "scenario_id": "T018",
+      "feature": "error response",
+      "scenario_type": "negative_acked_error_response_with_invalid_input",
+      "preconditions": [
+        "An error occurs during data processing.",
+        "Error handling is enabled."
+      ],
+      "stimulus": "Trigger a negative-acked error response with invalid input.",
+      "test_steps": [
+        "Initiate a data processing task with invalid input.",
+        "Monitor the system for any errors or warnings related to error response.",
+        "Verify that the system reports a negative-acked error response due to invalid input."
+      ],
+      "expected_result": "The system reports a negative-acked error response due to invalid input."
+    },
+    {
+      "scenario_id": "T019",
+      "feature": "idle insertion",
+      "scenario_type": "transfer_complete_while_idle",
+      "preconditions": [
+        "The system is in an idle state.",
+        "Transfer data is enabled."
+      ],
+      "stimulus": "Trigger a transfer operation while the system is in an idle state.",
+      "test_steps": [
+        "Initiate a transfer process with valid data.",
+        "Monitor the system for any errors or warnings related to transfer completion.",
+        "Verify that the system completes the transfer successfully."
+      ],
+      "expected_result": "The system completes the transfer operation successfully while in an idle state."
+    },
+    {
+      "scenario_id": "T020",
+      "feature": "error response",
+      "scenario_type": "memory_allocation_failure_due_to_transfer_complete_with_valid_input",
+      "preconditions": [
+        "An error occurs during memory allocation.",
+        "Error handling is enabled."
+      ],
+      "stimulus": "Trigger a memory allocation failure due to transfer completion with valid input.",
+      "test_steps": [
+        "Initiate a transfer process with valid data.",
+        "Monitor the system for any errors or warnings related to memory allocation.",
+        "Verify that the system reports an error response due to memory allocation failure."
+      ],
+      "expected_result": "The system reports an error response due to memory allocation failure."
+    }
+  ],
+  "total_scenarios": 20
+}

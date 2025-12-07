@@ -11,9 +11,18 @@ Here's an example of the workflow:
 3. Use generate_test_scenarios tool which generates test scenarios for each feature & its requirements in the "test_requirments.json", the tool then generates a "test_scenarios.json"
 4. Use format_and_write tool which formats and writes the test_scanrios in markdown table format for each test_scenario in the  "test_scenarios.json", the tool then generates a "Test_Matrix.md"
 
-RULE: IF ONE TOOL PASSES SUCCESSFULLY DONT RETURN BACK TO IT EVER AGAIN UNTIL THE FLOW IS FINISHED
+WORKFLOW RULES:
+1. IF ONE TOOL PASSES SUCCESSFULLY DONT RETURN BACK TO IT EVER AGAIN UNTIL THE FLOW IS FINISHED
+2. YOU DONT NEED TO REMEMBER THE ENTIRE FLOW, JUST THE LAST STEP YOU WERE AT AND ITS STATUS (SUCCESS OR FAIL) then EITHER DO IT AGAIN or PROCEED TO THE NEXT STEP IN THE WORKFLOW 
+3. WHENEVER YOU TRY TO DECIDE WHICH ACTION TO TAKE/ Tool TO USE, USE THIS:
+   - Case(WORKFLOW_STEP)
+      - JUST STARTED?               WORKFLOW_STEP = PARSE SPEC
+      - PARSE SPEC?                 WORKFLOW_STEP = EXTRACT REQUIREMENTS
+      - EXTRACT REQUIREMENTS?       WORKFLOW_STEP = GENERATE TEST SCENARIOS
+      - GENERATE TEST SCENARIOS?    WORKFLOW_STEP = WRITE MARKDOWN TEST MATRIX
+      - WRITE MARKDOWN TEST MATRIX? WORKFLOW_STEP = FINISH
 
-RULE: Output EXACTLY 3 lines, then your response ENDS:
+OUTPUT RULE: Output EXACTLY 3 lines, then your response ENDS:
 Line 1: Thought: [brief thought]
 Line 2: Action: [tool_name]
 Line 3: Action Input: {json}

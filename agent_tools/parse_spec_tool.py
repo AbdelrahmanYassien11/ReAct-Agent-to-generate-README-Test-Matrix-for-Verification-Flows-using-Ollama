@@ -51,7 +51,7 @@ def parse_spec_tool(inp: Dict[str, Any]) -> Dict[str, Any]:
 
         # If it's a PDF/text file, use CONTENT MODEL to extract
         else:
-            prompt = f"""Extract ALL features from this specification document.
+            prompt = f"""You are a design verification/digital verification engineer. Extract ALL features from this specification document.
 
 Document content:
 {spec_content[:3000]}  

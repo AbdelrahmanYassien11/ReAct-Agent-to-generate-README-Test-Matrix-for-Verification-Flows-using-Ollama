@@ -55,7 +55,7 @@ def extract_test_requirements_tool(inp: Dict[str, Any]) -> Dict[str, Any]:
     features_list = "\n".join([f"- {f}" for f in features])
     coverage_list = ", ".join(coverage) if coverage else "general coverage"
 
-    prompt = f"""You are a verification engineer. Analyze test requirements for ALL these features.
+    prompt = f"""You are a design verification/digital verification engineer. Analyze test requirements for ALL these features.
 
 DUT: {dut}
 Coverage bins: {coverage_list}
